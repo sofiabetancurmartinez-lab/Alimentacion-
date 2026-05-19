@@ -11,8 +11,8 @@ import json
 from gtts import gTTS
 from googletrans import Translator
 
-def on_publish(client,userdata,result):
-    print("Comando enviado correctamente \n")
+def on_publish(client,userdata,result):             #create function for callback
+    print("el dato ha sido publicado \n")
     pass
 
 def on_message(client, userdata, message):
@@ -23,19 +23,24 @@ def on_message(client, userdata, message):
 
 broker="broker.mqttdashboard.com"
 port=1883
-client1 = paho.Client(client_id="petbuddy_sofia")
+client1= paho.Client("sofibeta")
 client1.on_message = on_message
 
-st.title("🐾 PETBUDDY")
-st.subheader("CONTROL DE ALIMENTACIÓN POR VOZ")
+
+
+st.title("INTERFACES MULTIMODALES")
+st.subheader("CONTROL POR VOZ")
 
 image = Image.open('voice_ctrl.jpg')
 
 st.image(image, width=200)
 
-st.write("Toca el botón y di: alimentar, dar comida o servir comida")
 
-stt_button = Button(label="🎙️ Iniciar", width=200)
+
+
+st.write("Toca el Botón y habla ")
+
+stt_button = Button(label=" Inicio ", width=200)
 
 stt_button.js_on_event("button_click", CustomJS(code="""
     var recognition = new webkitSpeechRecognition();
@@ -66,34 +71,14 @@ result = streamlit_bokeh_events(
 
 if result:
     if "GET_TEXT" in result:
+        st.write(result.get("GET_TEXT"))
+        client1.on_publish = on_publish                            
+        client1.connect(broker,port)  
+        message =json.dumps({"Act1":result.get("GET_TEXT").strip()})
+        ret= client1.publish("voice_ctrl666", message)
 
-        comando = result.get("GET_TEXT").strip().lower()
-
-        st.write("Comando escuchado:", comando)
-
-        comandos_validos = [
-            "alimentar",
-            "dar comida",
-            "servir comida",
-            "comida",
-            "dale comida"
-        ]
-
-        if comando in comandos_validos:
-
-            client1.on_publish = on_publish
-            client1.connect(broker,port)
-
-            message = json.dumps({"Act1":"alimentar"})
-
-            ret = client1.publish("petbuddy_sofia_2026/feed", message)
-
-            st.success("🐶🍖 ¡Comida servida!")
-
-        else:
-            st.warning("Comando no reconocido")
-
-try:
-    os.mkdir("temp")
-except:
-    pass
+    
+    try:
+        os.mkdir("temp")
+    except:
+        pass
