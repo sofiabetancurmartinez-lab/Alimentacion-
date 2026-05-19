@@ -10,16 +10,9 @@ BROKER = "broker.hivemq.com"
 PORT = 1883
 TOPIC = "petbuddy_sofia_2026/feed"
 
-# Este TOPIC debe ser IGUAL en Wokwi:
-# const char* topic = "petbuddy_sofia_2026/feed";
-
-def on_publish(client, userdata, mid):
-    print("Comando publicado correctamente")
-
 def enviar_comando_mqtt(comando):
     try:
         client = mqtt.Client()
-        client.on_publish = on_publish
         client.connect(BROKER, PORT, 60)
         client.publish(TOPIC, comando)
         client.disconnect()
@@ -45,9 +38,12 @@ st.write(
 
 st.divider()
 
-st.markdown("### 🎙️ Habla con PetBuddy")
+st.markdown("### 🎙️ Activar comando de voz")
 
-stt_button = Button(label="🎙️ Iniciar reconocimiento de voz", width=300)
+stt_button = Button(
+    label="🎙️ Presiona aquí y di: alimentar",
+    width=320
+)
 
 stt_button.js_on_event("button_click", CustomJS(code="""
     var recognition = new webkitSpeechRecognition();
@@ -66,7 +62,7 @@ stt_button.js_on_event("button_click", CustomJS(code="""
         if (value != "") {
             document.dispatchEvent(new CustomEvent("GET_TEXT", {detail: value}));
         }
-    }
+    };
 
     recognition.start();
 """))
@@ -113,14 +109,4 @@ if result and "GET_TEXT" in result:
 
 st.divider()
 
-st.markdown("### 🧪 Prueba manual")
-
-if st.button("Alimentar manualmente 🦴", use_container_width=True):
-    enviado = enviar_comando_mqtt("alimentar")
-
-    if enviado:
-        st.success("Comando enviado manualmente a Wokwi 🐾")
-
-st.divider()
-
-st.info("Recuerda: primero debes darle Play a Wokwi y luego probar el comando desde Streamlit.")
+st.info("Primero dale Play a Wokwi. Luego presiona el botón y di: alimentar.")
