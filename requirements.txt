@@ -2,6 +2,6 @@ streamlit
 streamlit-bokeh-events
 bokeh
 pillow
-paho-mqtt
+paho-mqtt==1.6.1
 gtts
 googletrans==4.0.0rc1
