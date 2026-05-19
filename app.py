@@ -1,92 +1,126 @@
 import streamlit as st
+from bokeh.models.widgets import Button
+from bokeh.models import CustomJS
+from streamlit_bokeh_events import streamlit_bokeh_events
 import paho.mqtt.client as mqtt
 import time
 
+# ---------------- MQTT CONFIG ----------------
 BROKER = "broker.hivemq.com"
 PORT = 1883
-TOPIC = "petbuddy/sofia/alimentar"
+TOPIC = "petbuddy_sofia_2026/feed"
 
-def enviar_comando(comando):
+# Este TOPIC debe ser IGUAL en Wokwi:
+# const char* topic = "petbuddy_sofia_2026/feed";
+
+def on_publish(client, userdata, mid):
+    print("Comando publicado correctamente")
+
+def enviar_comando_mqtt(comando):
     try:
         client = mqtt.Client()
+        client.on_publish = on_publish
         client.connect(BROKER, PORT, 60)
         client.publish(TOPIC, comando)
         client.disconnect()
         return True
     except Exception as e:
-        st.error(f"Error enviando comando: {e}")
+        st.error(f"Error conectando con Wokwi: {e}")
         return False
 
+# ---------------- STREAMLIT UI ----------------
 st.set_page_config(
-    page_title="PetBuddy",
+    page_title="PetBuddy - Control por voz",
     page_icon="🐾",
     layout="centered"
 )
 
 st.title("🐾 PetBuddy")
-st.subheader("Página 1: Alimentación inteligente")
+st.subheader("Control de alimentación por voz 🎙️")
 
 st.write(
-    "Controla la alimentación de tu mascota desde una interfaz multimodal "
-    "usando botones y comandos de texto."
+    "Presiona el botón, di un comando como **alimentar**, **dar comida** "
+    "o **servir comida**, y PetBuddy activará el dispensador en Wokwi."
 )
 
 st.divider()
 
-st.markdown("## 🍽️ Alimentar mascota")
+st.markdown("### 🎙️ Habla con PetBuddy")
 
-st.image(
-    "https://cdn-icons-png.flaticon.com/512/616/616408.png",
-    width=150
+stt_button = Button(label="🎙️ Iniciar reconocimiento de voz", width=300)
+
+stt_button.js_on_event("button_click", CustomJS(code="""
+    var recognition = new webkitSpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = "es-ES";
+
+    recognition.onresult = function (e) {
+        var value = "";
+        for (var i = e.resultIndex; i < e.results.length; ++i) {
+            if (e.results[i].isFinal) {
+                value += e.results[i][0].transcript;
+            }
+        }
+
+        if (value != "") {
+            document.dispatchEvent(new CustomEvent("GET_TEXT", {detail: value}));
+        }
+    }
+
+    recognition.start();
+"""))
+
+result = streamlit_bokeh_events(
+    stt_button,
+    events="GET_TEXT",
+    key="listen",
+    refresh_on_update=False,
+    override_height=80,
+    debounce_time=0
 )
 
-if st.button("Alimentar ahora 🦴", use_container_width=True):
-    enviado = enviar_comando("alimentar")
+if result and "GET_TEXT" in result:
+    texto_voz = result.get("GET_TEXT").strip().lower()
 
-    if enviado:
-        with st.spinner("Enviando comida..."):
-            time.sleep(1)
-
-        st.success("¡Comida servida! 🐶🍖")
-        st.balloons()
-
-st.divider()
-
-st.markdown("## 💬 Comando por texto")
-
-comando_texto = st.text_input(
-    "Escribe un comando",
-    placeholder="Ej: alimentar, dar comida, comida"
-)
-
-if st.button("Enviar comando", use_container_width=True):
-    comando = comando_texto.lower().strip()
+    st.success(f"Comando escuchado: {texto_voz}")
 
     comandos_validos = [
         "alimentar",
         "dar comida",
-        "comida",
         "servir comida",
-        "feed"
+        "comida",
+        "dale comida",
+        "darle comida",
+        "alimenta a mi mascota",
+        "alimentar mascota",
+        "petbuddy alimentar"
     ]
 
-    if comando in comandos_validos:
-        enviado = enviar_comando("alimentar")
+    comando_reconocido = any(comando in texto_voz for comando in comandos_validos)
+
+    if comando_reconocido:
+        enviado = enviar_comando_mqtt("alimentar")
 
         if enviado:
-            st.success("Comando reconocido. Alimentando a tu mascota 🐾")
+            with st.spinner("Sirviendo comida..."):
+                time.sleep(1)
+
+            st.balloons()
+            st.success("¡Comida servida! 🐶🍖")
     else:
-        st.warning("Comando no reconocido. Intenta escribir: alimentar o dar comida.")
+        st.warning("No reconocí ese comando. Intenta decir: alimentar, dar comida o servir comida.")
 
 st.divider()
 
-st.markdown("## 📋 Estado del sistema")
+st.markdown("### 🧪 Prueba manual")
 
-st.info("Sistema conectado a PetBuddy. Listo para enviar comandos al dispensador.")
+if st.button("Alimentar manualmente 🦴", use_container_width=True):
+    enviado = enviar_comando_mqtt("alimentar")
 
-with st.expander("¿Qué hace esta página?"):
-    st.write(
-        "Esta página permite controlar un dispensador inteligente de comida "
-        "para mascotas. Al presionar el botón o escribir un comando válido, "
-        "Streamlit envía una señal por MQTT al ESP32 simulado en Wokwi."
-    )
+    if enviado:
+        st.success("Comando enviado manualmente a Wokwi 🐾")
+
+st.divider()
+
+st.info("Recuerda: primero debes darle Play a Wokwi y luego probar el comando desde Streamlit.")
